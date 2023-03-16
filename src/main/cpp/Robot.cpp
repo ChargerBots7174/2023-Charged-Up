@@ -11,6 +11,7 @@
 #include "networktables/NetworkTableValue.h"
 #include <span>
 #include "frc/DigitalInput.h"
+#include "Arm.h"
 
 #include <frc/TimedRobot.h>
 #include <frc/Timer.h>
@@ -21,11 +22,30 @@
 
 #define _USE_MATH_DEFINES
 
+#define BIAS 0.4
+
 void Robot::RobotInit()
 {
+    testArm.resetAllEncoders();
     ahrs = new AHRS(SPI::Port::kMXP);
     resetSensors();
     frc::CameraServer::StartAutomaticCapture();
+
+    m_chooser.SetDefaultOption(kDefaultTest, kDefaultTest);
+    m_chooser.AddOption(ktestMode, ktestMode);
+    frc::SmartDashboard::PutData("Test Mode", &m_chooser);
+
+    m_robothead.SetDefaultOption(kStaright, kStaright);
+    m_robothead.AddOption(kBack, kBack);
+    frc::SmartDashboard::PutData("NavX heading", &m_robothead);
+
+    m_steerPID.SetDefaultOption(kPIDON, kPIDON);
+    m_steerPID.AddOption(kPIDOFF, kPIDOFF);
+    frc::SmartDashboard::PutData("Steer PID", &m_steerPID);
+
+    m_auton.SetDefaultOption(kMID, kMID);
+    m_auton.AddOption(kSIDE, kSIDE);
+    frc::SmartDashboard::PutData("Auton", &m_auton);
 }
 
 void Robot::AutonomousInit()
@@ -39,163 +59,188 @@ void Robot::AutonomousInit()
 
 void Robot::TeleopInit()
 {
-
-    resetSensors();
-    resetAllEncoders();
+    if (m_chooser.GetSelected() == ktestMode)
+    {
+        resetSensors();
+        resetAllEncoders();
+        testArm.resetAllEncoders();
+    }
 }
-
 
 void Robot::TeleopPeriodic()
 {
-     driveTrain.drive(driveX, driveY, driveZ, nav_yaw, 1);
+    if (pressureSwitch == true)
+    {
+        pcmCompressor.EnableDigital();
+    }
+    else
+    {
+        pcmCompressor.Disable();
+    }
 
-    frc::SmartDashboard::PutNumber("back left vel", backLeftDriveMotor.GetSelectedSensorVelocity());
-    frc::SmartDashboard::PutNumber("front left vel", frontLeftDriveMotor.GetSelectedSensorVelocity());
-    frc::SmartDashboard::PutNumber("back right vel", backRightDriveMotor.GetSelectedSensorVelocity());
-    frc::SmartDashboard::PutNumber("front right vel", frontRightDriveMotor.GetSelectedSensorVelocity());
-
-    frc::SmartDashboard::PutNumber("back left pos", backLeftDriveMotor.GetSelectedSensorPosition());
-    frc::SmartDashboard::PutNumber("front left pos", frontLeftDriveMotor.GetSelectedSensorPosition());
-    frc::SmartDashboard::PutNumber("back right pos", backRightDriveMotor.GetSelectedSensorPosition());
-    frc::SmartDashboard::PutNumber("front right pos", frontRightDriveMotor.GetSelectedSensorPosition());
-
-    // how many degrees back is your limelight rotated from perfectly vertical?
-    double limelightMountAngleDegrees = 26.2; // 24.65 //26.75
-
-    // distance from the center of the Limelight lens to the floor
-    double limelightLensHeightInches = 18.0;
-
-    // distance from the target to the floor
-    double goalHeightInches = 104.0;
-
-    double angleToGoalDegrees = limelightMountAngleDegrees + targetOffsetAngle_Vertical;
-    double angleToGoalRadians = angleToGoalDegrees * (3.14159 / 180.0);
-
-    // calculate distance
-    double distanceFromLimelightToGoalInches = (goalHeightInches - limelightLensHeightInches) / tan(angleToGoalRadians);
+    // open and close claw
+    if (xboxController2.GetLeftBumper())
+    {
+        Grabber.Set(frc::DoubleSolenoid::Value::kForward);
+    }
+    else if (xboxController2.GetRightBumper())
+    {
+        Grabber.Set(frc::DoubleSolenoid::Value::kReverse);
+    }
 
     // DRIVE
     nav_yaw = -ahrs->GetYaw();
-  
-    nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("ledMode", 1);
-    nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("camMode", 1);
-    nt::NetworkTableInstance::GetDefault().GetTable("photonvision")->PutNumber("camMode", 1);
-
-
-    if (joystickController.GetRawButton(3) > 0.5 || buttonBoard.GetRawButton(9) > 0.5 || buttonBoard.GetRawButton(10) > 0.5)
-    { // changed from 4 to 3
-        driveX = 0;
-        driveY = 0;
-        nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("ledMode", 3);
-        nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("camMode", 0);
-        tx = nt::NetworkTableInstance::GetDefault().GetTable("limelight")->GetNumber("tx", 0.0) - 2;
-        targetOffsetAngle_Vertical = nt::NetworkTableInstance::GetDefault().GetTable("limelight")->GetNumber("ty", 0.0) - 2;
-        limelight.EnableContinuousInput(-300, 300);
-        driveZ = -limelight.Calculate(tx, 0);
-    }
-    else if (joystickController.GetRawButton(2) == 0)
+    if (xboxController.GetRightTriggerAxis() == 1)
     {
-        driveX = joystickController.GetX() * 0.25;
-        driveY = joystickController.GetY() * 0.25;
-        if (joystickController.GetRawButton(7) > 0.5)
-        { // changed 8 to 7
-            driveZ = 0;
-        }
-        else
-        {
-            driveZ = joystickController.GetTwist() * 0.25;
-        }
+        driveX = xboxController.GetLeftX();
+        driveY = xboxController.GetLeftY();
+        driveZ = xboxController.GetRightX();
         maxSpeed = 1;
     }
-    else if (joystickController.GetTrigger() > 0.5)
+    else if (xboxController.GetLeftTriggerAxis() == 1)
     {
-        driveX = joystickController.GetX() * 0.35;
-        driveY = joystickController.GetY() * 0.35;
-        if (joystickController.GetRawButton(7) > 0.5)
-        { // changed 8 to 7
-            driveZ = 0;
-        }
-        else
-        {
-            driveZ = joystickController.GetTwist() * 0.35;
-        }
+        driveX = xboxController.GetLeftX() * 0.1;
+        driveY = xboxController.GetLeftY() * 0.1;
+        driveZ = xboxController.GetRightX() * 0.1;
         maxSpeed = 1;
     }
     else
     {
-        driveX = joystickController.GetX();
-        driveY = joystickController.GetY();
-        if (joystickController.GetRawButton(7) > 0.5)
-        { // changed 8 to 7
-            driveZ = 0;
-        }
-        else
-        {
-            driveZ = joystickController.GetTwist();
-        }
+        driveX = xboxController.GetLeftX() * 0.25;
+        driveY = xboxController.GetLeftY() * 0.25;
+        driveZ = xboxController.GetRightX() * 0.25;
         maxSpeed = 1;
     }
-    // END
-
-    
-
-//start of the photonvision 
-if (joystickController.GetRawButton(3) > 0.5) {
-    // Vision-alignment mode
-    // Query the latest result from PhotonVision
-    photonlib::PhotonPipelineResult result = camera.GetLatestResult();
-
-    if (result.HasTargets()) {
-      // Rotation speed is the output of the PID controller
-      driveZ = -photoncontroller.Calculate(result.GetBestTarget().GetYaw(), 0);
-    } 
-    
-    else {
-      // If we have no targets, stay still.
-      driveZ = 0;
+    if (xboxController.GetRightX() < 0.08 && xboxController.GetRightX() > -0.08 && m_steerPID.GetSelected() == kPIDON)
+    {
+        driveZ = -std::clamp(yawPID.Calculate(nav_yaw, currentHead), -1.0, 1.0);
     }
+    if (xboxController.GetRightX() > 0.08 || xboxController.GetRightX() < -0.08)
+    {
+        currentHead = nav_yaw;
     }
-   else {
-    // Manual Driver Mode
-    driveZ = joystickController.GetTwist() > 0.5;
-  }
 
-  // Use our forward/turn speeds to control the drivetrain
-  driveTrain.drive(driveX, driveY, driveZ, nav_yaw, 1);
-};
+    // ARM
+    if (xboxController2.GetLeftX() > 0.1 || xboxController2.GetLeftX() < -0.1 || xboxController2.GetLeftY() > 0.1 || xboxController2.GetLeftY() < -0.1)
+    {
+        armX = armX + (xboxController2.GetLeftX() * 0.3);
+        armY = armY - (xboxController2.GetLeftY() * 0.3);
+    }
+    else if (xboxController2.GetYButton())
+    { // high
+        armX = 6000;
+        armY = 6000;
+    }
+    else if (xboxController2.GetAButton())
+    { // ground
+        armX = 25;
+        armY = 4;
+    }
+    else if (xboxController2.GetXButton())
+    { // mid
+        armX = 40;
+        armY = 52;
+    }
+    else if (xboxController2.GetBButton())
+    {
+        armX = 1000;
+        armY = 1000;
+    }
 
+    // Use our forward/turn speeds to control the drivetrain
+
+    frc::SmartDashboard::PutNumber("driveZ", driveZ);
+    frc::SmartDashboard::PutNumber("Yaw", nav_yaw);
+    frc::SmartDashboard::PutNumber("currHead", currentHead);
+    driveTrain.drive(driveX, driveY, driveZ, nav_yaw, 1, m_robothead.GetSelected());
+    testArm.moveArm(armX, armY);
+}
 
 void Robot::AutonomousPeriodic()
 {
-   
-
-    
-
     nav_yaw = -ahrs->GetYaw();
+    pitch = ahrs->GetRoll();
 
-    double targetOffsetAngle_Vertical = nt::NetworkTableInstance::GetDefault().GetTable("limelight")->GetNumber("ty", 0.0) - 2;
+    if (pressureSwitch == true)
+    {
+        pcmCompressor.EnableDigital();
+    }
+    else
+    {
+        pcmCompressor.Disable();
+    }
 
-    // how many degrees back is your limelight rotated from perfectly vertical?
-    double limelightMountAngleDegrees = 26.2; // 24.65
+    currTime = double(m_timer.Get());
+    if (currTime < 1)
+    {
+        Grabber.Set(frc::DoubleSolenoid::Value::kReverse);
+        armX = 38;
+        armY = 49;
+    }
+    else if (currTime < 1.25)
+    {
+        driveY = 0.081;
+    }
+    else if (currTime < 3)
+    {
+        driveY = 0.2;
+    }
+    else if (currTime < 4)
+    {
+        Grabber.Set(frc::DoubleSolenoid::Value::kForward);
+        driveY = 0;
+    }
+    else if (currTime < 5)
+    {
+        driveY = -0.3;
+    }
+    else if (currTime < 6)
+    {
+        driveY = 0;
+        armX = 1000;
+        armY = 1000;
+    }
+    else if (currTime < 6.5)
+    {
+        driveY = -0.3;
+        currDriveEnc = frontRightDriveMotor.GetSelectedSensorPosition();
+    }
+    else
+    {
+        if (m_auton.GetSelected() == kMID)
+        {
+            if (reachedStation == false)
+            {
+                driveY = -0.5;
+                if (pitch > 15)
+                {
+                    driveY = 0;
+                    reachedStation = true;
+                }
+            }
+            else
+            {
+                driveY = std::clamp(stationPID.Calculate(pitch, 0), -0.25, 0.25);
+            }
+        }
+        else
+        {
+            if (frontRightDriveMotor.GetSelectedSensorPosition() < ((24 * encDistance) + currDriveEnc))
+            {
+                driveY = -0.3;
+            }
+            else
+            {
+                driveY = 0;
+            }
+        }
+    }
+    frc::SmartDashboard::PutNumber("ARE YOU ON CHARGING STATION?", reachedStation);
+    frc::SmartDashboard::PutNumber("PITCHHHHHHHHHHHHHHHHHHHHHHH", pitch);
 
-    // distance from the center of the Limelight lens to the floor
-    double limelightLensHeightInches = 18.0;
-
-    // distance from the target to the floor
-    double goalHeightInches = 104.0;
-
-
-    double angleToGoalDegrees = limelightMountAngleDegrees + targetOffsetAngle_Vertical;
-    double angleToGoalRadians = angleToGoalDegrees * (3.14159 / 180.0);
-
-    // calculate distance
-    double distanceFromLimelightToGoalInches = (goalHeightInches - limelightLensHeightInches) / tan(angleToGoalRadians);
-    double tx = nt::NetworkTableInstance::GetDefault().GetTable("limelight")->GetNumber("tx", 0.0) - 2;
-    nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("ledMode", 3);
-    nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("camMode", 0);
-    frc::SmartDashboard::PutNumber("CitrusLumen", tx);
-
-    driveTrain.drive(driveX, driveY, driveZ, nav_yaw, 1);
+    driveZ = -std::clamp(yawPID.Calculate(nav_yaw, currentHead), -1.0, 1.0);
+    driveTrain.drive(driveX, driveY, driveZ, nav_yaw, 1, m_robothead.GetSelected());
+    testArm.moveArm(armX, armY);
 }
 
 void Robot::resetSensors()
