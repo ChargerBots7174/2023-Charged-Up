@@ -47,6 +47,10 @@ void Robot::RobotInit()
     m_auton.AddOption(kSIDE, kSIDE);
     frc::SmartDashboard::PutData("Auton", &m_auton);
 
+    m_cone.SetDefaultOption(kMidCone, kMidCone);
+    m_cone.AddOption(kHighCone, kHighCone);
+    frc::SmartDashboard::PutData("Cone Drop", &m_cone);
+
     m_led.SetLength(kLEDs);
     m_led.SetData(m_ledBuffer);
     m_led.Start();
@@ -59,6 +63,9 @@ void Robot::AutonomousInit()
     m_timer.Reset();
     m_timer.Start();
     targetFound = false;
+    m_led.SetLength(kLEDs);
+    m_led.SetData(m_ledBuffer);
+    m_led.Start();
 }
 
 void Robot::TeleopInit()
@@ -70,6 +77,9 @@ void Robot::TeleopInit()
         testArm.resetAllEncoders();
     }
     Grabber.Set(frc::DoubleSolenoid::Value::kReverse);
+    m_led.SetLength(kLEDs);
+    m_led.SetData(m_ledBuffer);
+    m_led.Start();
 }
 
 void Robot::TeleopPeriodic()
@@ -93,7 +103,7 @@ void Robot::TeleopPeriodic()
     {
         Grabber.Set(frc::DoubleSolenoid::Value::kReverse);
     }
- 
+
     // DRIVE
     nav_yaw = -ahrs->GetYaw();
     if (xboxController.GetRightTriggerAxis() == 1)
@@ -140,12 +150,12 @@ void Robot::TeleopPeriodic()
     else if (xboxController2.GetAButton())
     { // ground
         armX = 25;
-        armY = 4;
+        armY = 4.5;
     }
     else if (xboxController2.GetXButton())
     { // mid
         armX = 38;
-        armY = 52;
+        armY = 48;
     }
     else if (xboxController2.GetBButton())
     {
@@ -212,36 +222,44 @@ void Robot::AutonomousPeriodic()
     }
 
     currTime = double(m_timer.Get());
-    if (currTime < 1)
+    if (currTime < 2)
     {
         Grabber.Set(frc::DoubleSolenoid::Value::kReverse);
-        armX = 38;
-        armY = 49;
+        if (m_cone.GetSelected() == kHighCone)
+        {
+            armX = 6000;
+            armY = 6000;
+        }
+        else
+        {
+            armX = 38;
+            armY = 48;
+        }
     }
-    else if (currTime < 1.25)
+    else if (currTime < 2.25)
     {
         driveY = 0.081;
     }
-    else if (currTime < 3)
+    else if (currTime < 4)
     {
         driveY = 0.2;
     }
-    else if (currTime < 4)
+    else if (currTime < 5)
     {
         Grabber.Set(frc::DoubleSolenoid::Value::kForward);
         driveY = 0;
     }
-    else if (currTime < 5)
+    else if (currTime < 6)
     {
         driveY = -0.3;
     }
-    else if (currTime < 6)
+    else if (currTime < 7)
     {
         driveY = 0;
         armX = 1000;
         armY = 1000;
     }
-    else if (currTime < 6.5)
+    else if (currTime < 8.5)
     {
         driveY = -0.3;
         currDriveEnc = frontRightDriveMotor.GetSelectedSensorPosition();
@@ -266,7 +284,7 @@ void Robot::AutonomousPeriodic()
         }
         else
         {
-            if (frontRightDriveMotor.GetSelectedSensorPosition() < ((24 * encDistance) + currDriveEnc))
+            if (currTime < 9.5)
             {
                 driveY = -0.3;
             }

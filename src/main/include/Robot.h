@@ -73,6 +73,10 @@ public:
     const std::string kMID = "MID position";
     const std::string kSIDE = "SIDE position";
 
+    frc::SendableChooser<std::string> m_cone;
+    const std::string kHighCone = "High Cone";
+    const std::string kMidCone = "Mid Cone";
+
     frc::XboxController xboxController{0};
     frc::XboxController xboxController2{1};
 
