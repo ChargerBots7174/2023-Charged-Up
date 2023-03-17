@@ -46,6 +46,10 @@ void Robot::RobotInit()
     m_auton.SetDefaultOption(kMID, kMID);
     m_auton.AddOption(kSIDE, kSIDE);
     frc::SmartDashboard::PutData("Auton", &m_auton);
+
+    m_led.SetLength(kLEDs);
+    m_led.SetData(m_ledBuffer);
+    m_led.Start();
 }
 
 void Robot::AutonomousInit()
@@ -65,6 +69,7 @@ void Robot::TeleopInit()
         resetAllEncoders();
         testArm.resetAllEncoders();
     }
+    Grabber.Set(frc::DoubleSolenoid::Value::kReverse);
 }
 
 void Robot::TeleopPeriodic()
@@ -79,6 +84,7 @@ void Robot::TeleopPeriodic()
     }
 
     // open and close claw
+
     if (xboxController2.GetLeftBumper())
     {
         Grabber.Set(frc::DoubleSolenoid::Value::kForward);
@@ -87,7 +93,7 @@ void Robot::TeleopPeriodic()
     {
         Grabber.Set(frc::DoubleSolenoid::Value::kReverse);
     }
-
+ 
     // DRIVE
     nav_yaw = -ahrs->GetYaw();
     if (xboxController.GetRightTriggerAxis() == 1)
@@ -138,7 +144,7 @@ void Robot::TeleopPeriodic()
     }
     else if (xboxController2.GetXButton())
     { // mid
-        armX = 40;
+        armX = 38;
         armY = 52;
     }
     else if (xboxController2.GetBButton())
@@ -146,6 +152,41 @@ void Robot::TeleopPeriodic()
         armX = 1000;
         armY = 1000;
     }
+
+    if (xboxController.GetXButton())
+    {
+        idleLED = false;
+        for (int i = 0; i < kLEDs; i++)
+        {
+            m_ledBuffer[i].SetRGB(0, 0, 255);
+        }
+    }
+    else if (xboxController.GetAButton())
+    {
+        idleLED = false;
+        for (int i = 0; i < kLEDs; i++)
+        {
+            m_ledBuffer[i].SetRGB(250, 150, 0);
+        }
+    }
+    else if (xboxController.GetBButton() || idleLED == true)
+    {
+        idleLED = true;
+        for (int i = 0; i < kLEDs; i++)
+        {
+            // Calculate the hue - hue is easier for rainbows because the color
+            // shape is a circle so only one value needs to precess
+            const auto pixelHue = (firstPixelHue + (i * 180 / kLEDs)) % 180;
+            // Set the value
+            m_ledBuffer[i].SetHSV(pixelHue, 255, 128);
+        }
+        // Increase by to make the rainbow "move"
+        firstPixelHue += 3;
+        // Check bounds
+        firstPixelHue %= 180;
+    }
+
+    m_led.SetData(m_ledBuffer);
 
     // Use our forward/turn speeds to control the drivetrain
 
@@ -237,6 +278,24 @@ void Robot::AutonomousPeriodic()
     }
     frc::SmartDashboard::PutNumber("ARE YOU ON CHARGING STATION?", reachedStation);
     frc::SmartDashboard::PutNumber("PITCHHHHHHHHHHHHHHHHHHHHHHH", pitch);
+
+    idleLED = true;
+    for (int i = 0; i < kLEDs; i++)
+    {
+        // Calculate the hue - hue is easier for rainbows because the color
+        // shape is a circle so only one value needs to precess
+        const auto pixelHue = (firstPixelHue + (i * 180 / kLEDs)) % 180;
+        // Set the value
+        m_ledBuffer[i].SetHSV(pixelHue, 255, 128);
+    }
+    // Increase by to make the rainbow "move"
+    firstPixelHue += 3;
+    // Check bounds
+    firstPixelHue %= 180;
+
+    m_led.SetData(m_ledBuffer);
+
+    idleLED = true;
 
     driveZ = -std::clamp(yawPID.Calculate(nav_yaw, currentHead), -1.0, 1.0);
     driveTrain.drive(driveX, driveY, driveZ, nav_yaw, 1, m_robothead.GetSelected());

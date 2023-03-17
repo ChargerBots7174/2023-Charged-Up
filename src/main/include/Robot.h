@@ -24,6 +24,7 @@
 #include <frc/controller/PIDController.h>
 #include <frc/PneumaticHub.h>
 #include <frc/Compressor.h>
+#include <frc/AddressableLED.h>
 #include <frc/DoubleSolenoid.h>
 #include <frc/smartdashboard/SendableChooser.h>
 
@@ -44,6 +45,17 @@ public:
     void TestPeriodic() override;
     void resetSensors();
     int getLime();
+
+    static constexpr int kLEDs = 129;
+    bool idleLED = false;
+
+    // PWM port 9
+    // Must be a PWM header, not MXP or DIO
+    frc::AddressableLED m_led{9};
+    std::array<frc::AddressableLED::LEDData, kLEDs>
+        m_ledBuffer; // Reuse the buffer
+    // Store what the last hue of the first pixel is
+    int firstPixelHue = 0;
 
     frc::SendableChooser<std::string> m_chooser;
     const std::string kDefaultTest = "Comp mode";
