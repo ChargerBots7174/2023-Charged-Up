@@ -15,5 +15,8 @@
     "**/*~": true
   },
   "C_Cpp.default.configurationProvider": "vscode-wpilib",
-  "C_Cpp.intelliSenseEngineFallback": "enabled"
+  "C_Cpp.intelliSenseEngineFallback": "enabled",
+  "files.associations": {
+    "*.inc": "cpp"
+  }
 }

@@ -7,6 +7,7 @@
 #include "frc/smartdashboard/Smartdashboard.h"
 #include <frc/controller/PIDController.h>
 #include "AHRS.h"
+#include <frc/AnalogEncoder.h>
 
 #define GEAR_RATIO 6.54
 #define ENCODER_TO_INCHES 6.54 * 2048 / 4 * 3.14159265; // 2048 number
@@ -32,6 +33,15 @@ private:
 	frc2::PIDController steerPID{0.00675, 0, 0};
 	frc2::PIDController drivePID{1, 0, 0};
 	frc2::PIDController gyroPID{0.45, 0, 0};
+
+	frc::AnalogEncoder frontRightAbsEnc{1};
+	frc::AnalogEncoder frontLeftAbsEnc{2};
+	frc::AnalogEncoder backLeftAbsEnc{3};
+	frc::AnalogEncoder backRightAbsEnc{0};
+	double frontRightMagOffset = 0.027116;
+	double frontLeftMagOffset = 0.281434;
+	double backRightMagOffset = 0.101869;
+	double backLeftMagOffset = 0.811742;
 
 	double robotWidth = 27;
 	double robotLength = 27;

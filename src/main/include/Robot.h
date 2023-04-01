@@ -131,10 +131,9 @@ private:
     double currTime = 0;
     bool reachedStation = false;
 
-    frc2::PIDController limelight{0.0275, 0, 0};    // possibly change the pid to 0.025
-    frc2::PIDController limelightAuton{0.03, 0, 0}; // possibly change the pid 0.05
+    frc2::PIDController limelight{0.0225, 0, 0};    // possibly change the pid to 0.025
     frc2::PIDController stationPID{0.01, 0, 0};     // possibly change the pid 0.05
-    frc2::PIDController yawPID{0.01, 0, 0};         // possibly change the pid 0.05
+    frc2::PIDController yawPID{0.02, 0, 0};         // possibly change the pid 0.05
 
     double speedMul = 0;
     AHRS *ahrs;

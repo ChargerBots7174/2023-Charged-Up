@@ -39,8 +39,8 @@ void Robot::RobotInit()
     m_robothead.AddOption(kBack, kBack);
     frc::SmartDashboard::PutData("NavX heading", &m_robothead);
 
-    m_steerPID.SetDefaultOption(kPIDON, kPIDON);
-    m_steerPID.AddOption(kPIDOFF, kPIDOFF);
+    m_steerPID.SetDefaultOption(kPIDOFF, kPIDOFF);
+    m_steerPID.AddOption(kPIDON, kPIDON);
     frc::SmartDashboard::PutData("Steer PID", &m_steerPID);
 
     m_auton.SetDefaultOption(kMID, kMID);
@@ -84,14 +84,7 @@ void Robot::TeleopInit()
 
 void Robot::TeleopPeriodic()
 {
-    if (pressureSwitch == true)
-    {
-        pcmCompressor.EnableDigital();
-    }
-    else
-    {
-        pcmCompressor.Disable();
-    }
+    pcmCompressor.EnableDigital();
 
     // open and close claw
 
@@ -106,6 +99,7 @@ void Robot::TeleopPeriodic()
 
     // DRIVE
     nav_yaw = -ahrs->GetYaw();
+
     if (xboxController.GetRightTriggerAxis() == 1)
     {
         driveX = xboxController.GetLeftX();
@@ -115,17 +109,27 @@ void Robot::TeleopPeriodic()
     }
     else if (xboxController.GetLeftTriggerAxis() == 1)
     {
-        driveX = xboxController.GetLeftX() * 0.1;
-        driveY = xboxController.GetLeftY() * 0.1;
-        driveZ = xboxController.GetRightX() * 0.1;
+        driveX = xboxController.GetLeftX() * 0.15;
+        driveY = xboxController.GetLeftY() * 0.15;
+        driveZ = xboxController.GetRightX() * 0.15;
         maxSpeed = 1;
+    }
+    else if (xboxController.GetLeftBumper()){
+        driveY = xboxController.GetLeftY() * 0.25;
+        nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("ledMode", 3);
+        tx = nt::NetworkTableInstance::GetDefault().GetTable("limelight")->GetNumber("tx", 0.0);
+        frc::SmartDashboard::PutNumber("Limelight X Offset", tx);
+        driveX = std::clamp(limelight.Calculate(tx, 0), -0.50, 0.50);
+        driveZ = -std::clamp(yawPID.Calculate(nav_yaw, 0), -0.75, 0.75);
+        frc::SmartDashboard::PutNumber("Limelight Swerve Speed", driveX);
     }
     else
     {
-        driveX = xboxController.GetLeftX() * 0.25;
-        driveY = xboxController.GetLeftY() * 0.25;
-        driveZ = xboxController.GetRightX() * 0.25;
+        driveX = xboxController.GetLeftX() * 0.5;
+        driveY = xboxController.GetLeftY() * 0.5;
+        driveZ = xboxController.GetRightX() * 0.5;
         maxSpeed = 1;
+        nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("ledMode", 1);
     }
     if (xboxController.GetRightX() < 0.08 && xboxController.GetRightX() > -0.08 && m_steerPID.GetSelected() == kPIDON)
     {
@@ -139,8 +143,8 @@ void Robot::TeleopPeriodic()
     // ARM
     if (xboxController2.GetLeftX() > 0.1 || xboxController2.GetLeftX() < -0.1 || xboxController2.GetLeftY() > 0.1 || xboxController2.GetLeftY() < -0.1)
     {
-        armX = armX + (xboxController2.GetLeftX() * 0.3);
-        armY = armY - (xboxController2.GetLeftY() * 0.3);
+        armX = armX + (xboxController2.GetLeftX() * 0.4);
+        armY = armY - (xboxController2.GetLeftY() * 0.4);
     }
     else if (xboxController2.GetYButton())
     { // high
@@ -150,14 +154,14 @@ void Robot::TeleopPeriodic()
     else if (xboxController2.GetAButton())
     { // ground
         armX = 25;
-        armY = 4.5;
+        armY = 4;
     }
     else if (xboxController2.GetXButton())
     { // mid
-        armX = 38;
-        armY = 48;
+        armX = 34;
+        armY = 49;
     }
-    else if (xboxController2.GetBButton())
+    else if (xboxController2.GetBButton() || xboxController.GetLeftStickButton() || xboxController.GetRightStickButton())
     {
         armX = 1000;
         armY = 1000;
@@ -197,7 +201,6 @@ void Robot::TeleopPeriodic()
     }
 
     m_led.SetData(m_ledBuffer);
-
     // Use our forward/turn speeds to control the drivetrain
 
     frc::SmartDashboard::PutNumber("driveZ", driveZ);
@@ -212,14 +215,7 @@ void Robot::AutonomousPeriodic()
     nav_yaw = -ahrs->GetYaw();
     pitch = ahrs->GetRoll();
 
-    if (pressureSwitch == true)
-    {
-        pcmCompressor.EnableDigital();
-    }
-    else
-    {
-        pcmCompressor.Disable();
-    }
+    pcmCompressor.EnableDigital();
 
     currTime = double(m_timer.Get());
     if (currTime < 2)

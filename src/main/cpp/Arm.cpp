@@ -8,6 +8,12 @@ float xTarget;
 
 void Arm::moveArm(double x, double y)
 {
+    if(x < 1){
+        x = 1000;
+    }
+    if(y < 1){
+        y = 1000;
+    }
     Arm::updateAllEncoders();
     if (y != 1000)
     {

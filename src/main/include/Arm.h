@@ -21,7 +21,7 @@ private:
     double LOWER_ENCODER_TO_ANGLE = (204800 * (52 / 12)) / 360;
 
     double joint1Length = 23.75;
-    double joint2Length = 27;
+    double joint2Length = 27.5;
     double intakeArmLength = 38;
 
     double currentJoint2Angle = 0;
