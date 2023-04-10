@@ -23,6 +23,9 @@
 #define _USE_MATH_DEFINES
 
 #define BIAS 0.4
+#define FILTER 0.8
+
+
 
 void Robot::RobotInit()
 {
@@ -76,6 +79,14 @@ void Robot::TeleopInit()
         resetAllEncoders();
         testArm.resetAllEncoders();
     }
+    filtered.x = 0;
+    filtered.z = 0;
+    filtered.y = 0;
+    limelight.EnableContinuousInput(-27,27);
+    frc::SmartDashboard::PutNumber("random test z", filterValue);
+    frc::SmartDashboard::PutNumber("Test Angle", 130);
+
+    
     Grabber.Set(frc::DoubleSolenoid::Value::kReverse);
     m_led.SetLength(kLEDs);
     m_led.SetData(m_ledBuffer);
@@ -99,6 +110,7 @@ void Robot::TeleopPeriodic()
 
     // DRIVE
     nav_yaw = -ahrs->GetYaw();
+    yawPID.EnableContinuousInput(-180, 180);
 
     if (xboxController.GetRightTriggerAxis() == 1)
     {
@@ -116,20 +128,30 @@ void Robot::TeleopPeriodic()
     }
     else if (xboxController.GetLeftBumper()){
         driveY = xboxController.GetLeftY() * 0.25;
+        driveX = xboxController.GetLeftX() * 0.25;
+        driveZ = -std::clamp(yawPID.Calculate(nav_yaw, 180), -0.5, 0.5);
+    }
+    else if (xboxController.GetRightBumper()){
+        driveY = xboxController.GetLeftY() * 0.25;
+        driveX = xboxController.GetLeftX() * 0.25;
+        driveZ = -std::clamp(yawPID.Calculate(nav_yaw, 0), -0.5, 0.5);
+    }
+    else if (xboxController.GetXButton()){
         nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("ledMode", 3);
         tx = nt::NetworkTableInstance::GetDefault().GetTable("limelight")->GetNumber("tx", 0.0);
-        frc::SmartDashboard::PutNumber("Limelight X Offset", tx);
+        frc::SmartDashboard::PutNumber("limelight offset", tx);
+
+        driveY = xboxController.GetLeftY() * 0.25;
         driveX = std::clamp(limelight.Calculate(tx, 0), -0.50, 0.50);
-        driveZ = -std::clamp(yawPID.Calculate(nav_yaw, 0), -0.75, 0.75);
-        frc::SmartDashboard::PutNumber("Limelight Swerve Speed", driveX);
+        driveZ = -std::clamp(yawPID.Calculate(nav_yaw, 0), -0.5, 0.5);
     }
     else
     {
-        driveX = xboxController.GetLeftX() * 0.5;
-        driveY = xboxController.GetLeftY() * 0.5;
-        driveZ = xboxController.GetRightX() * 0.5;
-        maxSpeed = 1;
         nt::NetworkTableInstance::GetDefault().GetTable("limelight")->PutNumber("ledMode", 1);
+        driveX = xboxController.GetLeftX() * 0.35;
+        driveY = xboxController.GetLeftY() * 0.35;
+        driveZ = xboxController.GetRightX() * 0.35;
+        maxSpeed = 1;
     }
     if (xboxController.GetRightX() < 0.08 && xboxController.GetRightX() > -0.08 && m_steerPID.GetSelected() == kPIDON)
     {
@@ -143,8 +165,8 @@ void Robot::TeleopPeriodic()
     // ARM
     if (xboxController2.GetLeftX() > 0.1 || xboxController2.GetLeftX() < -0.1 || xboxController2.GetLeftY() > 0.1 || xboxController2.GetLeftY() < -0.1)
     {
-        armX = armX + (xboxController2.GetLeftX() * 0.4);
-        armY = armY - (xboxController2.GetLeftY() * 0.4);
+        armX = armX + (xboxController2.GetLeftX() * 0.3);
+        armY = armY - (xboxController2.GetLeftY() * 0.3);
     }
     else if (xboxController2.GetYButton())
     { // high
@@ -166,59 +188,47 @@ void Robot::TeleopPeriodic()
         armX = 1000;
         armY = 1000;
     }
+    
+    // driveX = floor(driveX * 10.) / 10.;
+    // driveY = floor(driveY * 10.) / 10.;
+    
+    frc::SmartDashboard::PutNumber("filter X", driveX);
+    frc::SmartDashboard::PutNumber("filter Y", driveY);
+    frc::SmartDashboard::PutNumber("filter Z", driveZ);
 
-    if (xboxController.GetXButton())
-    {
-        idleLED = false;
-        for (int i = 0; i < kLEDs; i++)
-        {
-            m_ledBuffer[i].SetRGB(0, 0, 255);
-        }
-    }
-    else if (xboxController.GetAButton())
-    {
-        idleLED = false;
-        for (int i = 0; i < kLEDs; i++)
-        {
-            m_ledBuffer[i].SetRGB(250, 150, 0);
-        }
-    }
-    else if (xboxController.GetBButton() || idleLED == true)
-    {
-        idleLED = true;
-        for (int i = 0; i < kLEDs; i++)
-        {
-            // Calculate the hue - hue is easier for rainbows because the color
-            // shape is a circle so only one value needs to precess
-            const auto pixelHue = (firstPixelHue + (i * 180 / kLEDs)) % 180;
-            // Set the value
-            m_ledBuffer[i].SetHSV(pixelHue, 255, 128);
-        }
-        // Increase by to make the rainbow "move"
-        firstPixelHue += 3;
-        // Check bounds
-        firstPixelHue %= 180;
-    }
+    frc::SmartDashboard::PutNumber("joystick X", current.x);
+    frc::SmartDashboard::PutNumber("joystick y", current.y);
+    frc::SmartDashboard::PutNumber("joystick z", current.z);
 
-    m_led.SetData(m_ledBuffer);
-    // Use our forward/turn speeds to control the drivetrain
+    
+    filterValue = frc::SmartDashboard::GetNumber("random test z", 0.1);
 
-    frc::SmartDashboard::PutNumber("driveZ", driveZ);
-    frc::SmartDashboard::PutNumber("Yaw", nav_yaw);
-    frc::SmartDashboard::PutNumber("currHead", currentHead);
+    //filter inputs
+    current.x = driveX;
+    current.y = driveY;
+    current.z = driveZ;
+    filter(filterValue, &current, &filtered);
+    driveX = filtered.x;
+    driveY = filtered.y;
+    driveZ = filtered.z;
+
+    
     driveTrain.drive(driveX, driveY, driveZ, nav_yaw, 1, m_robothead.GetSelected());
     testArm.moveArm(armX, armY);
 }
 
 void Robot::AutonomousPeriodic()
 {
+    
+    pcmCompressor.EnableDigital();
     nav_yaw = -ahrs->GetYaw();
     pitch = ahrs->GetRoll();
 
+    yawPID.EnableContinuousInput(-180, 180);
     pcmCompressor.EnableDigital();
 
     currTime = double(m_timer.Get());
-    if (currTime < 2)
+    if (currTime < 1.5)
     {
         Grabber.Set(frc::DoubleSolenoid::Value::kReverse);
         if (m_cone.GetSelected() == kHighCone)
@@ -232,33 +242,24 @@ void Robot::AutonomousPeriodic()
             armY = 48;
         }
     }
-    else if (currTime < 2.25)
+    else if (currTime < 2.5)
     {
-        driveY = 0.081;
+        driveY = 0.3;
     }
-    else if (currTime < 4)
-    {
-        driveY = 0.2;
-    }
-    else if (currTime < 5)
+    else if (currTime < 3)
     {
         Grabber.Set(frc::DoubleSolenoid::Value::kForward);
         driveY = 0;
     }
-    else if (currTime < 6)
+    else if (currTime < 6.75)
     {
-        driveY = -0.3;
-    }
-    else if (currTime < 7)
-    {
-        driveY = 0;
+        driveY = -0.4;
         armX = 1000;
         armY = 1000;
     }
-    else if (currTime < 8.5)
+    else if (currTime < 7.25)
     {
-        driveY = -0.3;
-        currDriveEnc = frontRightDriveMotor.GetSelectedSensorPosition();
+        driveY = 0;
     }
     else
     {
@@ -266,8 +267,8 @@ void Robot::AutonomousPeriodic()
         {
             if (reachedStation == false)
             {
-                driveY = -0.5;
-                if (pitch > 15)
+                driveY = 0.6; //remove - is we cross community
+                if (pitch > 15 || -15 > pitch)
                 {
                     driveY = 0;
                     reachedStation = true;
@@ -275,25 +276,20 @@ void Robot::AutonomousPeriodic()
             }
             else
             {
-                driveY = std::clamp(stationPID.Calculate(pitch, 0), -0.25, 0.25);
+                driveY = std::clamp(stationPID.Calculate(pitch, 0), -0.35, 0.35);
             }
+            driveZ = -std::clamp(yawPID.Calculate(nav_yaw, 0), -1.0, 1.0);
         }
         else
         {
-            if (currTime < 9.5)
-            {
-                driveY = -0.3;
-            }
-            else
-            {
                 driveY = 0;
-            }
+                driveZ = -std::clamp(yawPID.Calculate(nav_yaw, 180), -0.5, 0.5);
         }
     }
-    frc::SmartDashboard::PutNumber("ARE YOU ON CHARGING STATION?", reachedStation);
-    frc::SmartDashboard::PutNumber("PITCHHHHHHHHHHHHHHHHHHHHHHH", pitch);
+    if (currTime < 7.25){
+        driveZ = -std::clamp(yawPID.Calculate(nav_yaw, 0), -1.0, 1.0);
+    }
 
-    idleLED = true;
     for (int i = 0; i < kLEDs; i++)
     {
         // Calculate the hue - hue is easier for rainbows because the color
@@ -308,12 +304,21 @@ void Robot::AutonomousPeriodic()
     firstPixelHue %= 180;
 
     m_led.SetData(m_ledBuffer);
-
+    
     idleLED = true;
 
-    driveZ = -std::clamp(yawPID.Calculate(nav_yaw, currentHead), -1.0, 1.0);
     driveTrain.drive(driveX, driveY, driveZ, nav_yaw, 1, m_robothead.GetSelected());
     testArm.moveArm(armX, armY);
+}
+
+void Robot::filter(double filter, inputs *current, inputs *previous){
+    //(1-a)*filtered + a*current
+    double ts = 1.0/50.0; //time step
+    double a = ts/(filter+ts);
+    previous->x = (1.0 - a)*previous->x + a*current->x;
+    previous->y = (1.0 - a)*previous->y + a*current->y;
+    previous->z = (1.0 - a)*previous->z + a*current->z;
+
 }
 
 void Robot::resetSensors()

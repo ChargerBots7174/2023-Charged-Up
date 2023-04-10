@@ -80,6 +80,7 @@ public:
     frc::XboxController xboxController{0};
     frc::XboxController xboxController2{1};
 
+
     double limeOffset;
 
     double frontRightDriveEncoder = 0;
@@ -119,11 +120,25 @@ public:
 
 private:
     // CONTROLLER VALUES
+    typedef struct inputs{
+        float x;
+        float y;
+        float z;
+    }inputs;
+
+    inputs current;
+    inputs filtered;
+    double filterValue = 0.2;
+
+
     double xOffSet;
     bool targetFound = false;
     double finalShotVel = 0;
     double finalShotSpeed = 0;
     Timer m_timer;
+
+    double limitX = 0;
+    double limitY = 0;
 
     double pitch = 0;
     double currentHead = 0;
@@ -132,8 +147,8 @@ private:
     bool reachedStation = false;
 
     frc2::PIDController limelight{0.0225, 0, 0};    // possibly change the pid to 0.025
-    frc2::PIDController stationPID{0.01, 0, 0};     // possibly change the pid 0.05
-    frc2::PIDController yawPID{0.02, 0, 0};         // possibly change the pid 0.05
+    frc2::PIDController stationPID{0.011, 0, 0};     // possibly change the pid 0.05
+    frc2::PIDController yawPID{0.0075, 0, 0};         // possibly change the pid 0.05
 
     double speedMul = 0;
     AHRS *ahrs;
@@ -156,6 +171,8 @@ private:
     // PID constants should be tuned per robot
     frc2::PIDController photoncontroller{.1, 0, 0}; // tune the PID numbers
     // end of photon align
+
+    void filter(double filterAmount, inputs *current, inputs *previous);
 
     void updateAllEncoders()
     {

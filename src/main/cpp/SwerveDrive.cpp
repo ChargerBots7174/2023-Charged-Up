@@ -42,6 +42,8 @@ void SwerveDrive::drive(double xv, double yv, double omega, double yaw, double m
     double c = yv - omega * (robotWidth / r);
     double d = yv + omega * (robotWidth / r);
 
+    
+
     // MOTOR SPEED CALCULATIONS
 
     backRightSpeed = sqrt(((a * a) + (c * c)));

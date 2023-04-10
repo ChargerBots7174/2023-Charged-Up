@@ -39,7 +39,8 @@ void Arm::moveArm(double x, double y)
 
     if (x == 6000)
     {
-        joint1 = 135;
+        joint1 = frc::SmartDashboard::GetNumber("Test Angle", 130);
+        //joint1 = 135;
         joint2 = 180;
     }
     if (x == 1000)
@@ -57,13 +58,6 @@ void Arm::moveArm(double x, double y)
 
     joint1Motor.Set(ControlMode::PercentOutput, -(std::clamp(joint1PID.Calculate(currentJoint1Angle, joint1), -0.80, 0.80)));
     joint2Motor.Set(ControlMode::PercentOutput, (std::clamp(joint2PID.Calculate(currentJoint2Angle, joint2), -0.80, 0.80)));
-
-    frc::SmartDashboard::PutNumber("currentJoint1Angle", currentJoint1Angle);
-    frc::SmartDashboard::PutNumber("currentJoint2Angle", currentJoint2Angle);
-    frc::SmartDashboard::PutNumber("SetJoint1", joint1);
-    frc::SmartDashboard::PutNumber("SetJoint2", joint2);
-    frc::SmartDashboard::PutNumber("ArmX", x);
-    frc::SmartDashboard::PutNumber("ArmY", y);
 }
 
 void Arm::resetAllEncoders()
